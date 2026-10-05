@@ -1,0 +1,39 @@
+{
+ "n_queries": 62,
+ "rejected_as_unknown": 5,
+ "top1_acc_all": 0.7580645161290323,
+ "top1_acc_accepted": 0.8245614035087719,
+ "threshold": 0.7033937573432922,
+ "confusion": {
+  "Banarasi": {
+   "Banarasi": 12,
+   "Bandhani": 5,
+   "Ikat": 0,
+   "Pichwai": 1
+  },
+  "Bandhani": {
+   "Banarasi": 2,
+   "Bandhani": 14,
+   "Ikat": 2,
+   "Pichwai": 0
+  },
+  "Ikat": {
+   "Banarasi": 0,
+   "Bandhani": 0,
+   "Ikat": 10,
+   "Pichwai": 0
+  },
+  "Pichwai": {
+   "Banarasi": 0,
+   "Bandhani": 0,
+   "Ikat": 0,
+   "Pichwai": 11
+  },
+  "UNKNOWN": {
+   "Banarasi": 1,
+   "Bandhani": 1,
+   "Ikat": 2,
+   "Pichwai": 1
+  }
+ }
+}
