@@ -13,7 +13,7 @@ pinned: false
 
 ### Design retrieval for sarees, independent of colour
 
-**Live Demo:** `COMING SOON`
+**Live Demo:** [Open Application](https://color-invariant-saree-design-recognition-envxlsumxeptv2hjrd5ct.streamlit.app/)
 
 **GitHub:** [patilanuja602](https://github.com/patilanuja602)
 **LinkedIn:** [Anuja Patil](https://www.linkedin.com/in/anuja-patil-7649a124)
@@ -156,9 +156,7 @@ The deployed application will allow a user to:
 
 ### Live Demo
 
-**[Open the Live Application](YOUR_DEPLOYED_APP_LINK)**
-
-*The deployment link will be added once the application is live.*
+**[Open the Live Application](https://color-invariant-saree-design-recognition-envxlsumxeptv2hjrd5ct.streamlit.app/)**
 
 ---
 
