@@ -6,7 +6,7 @@ venv/
 *.zip
 .ipynb_checkpoints/
 # proprietary / large / derived-from-private-data
-
-
+weights/*.pt
+!weights/saree_embedder_slim.pt
 data/
 deeplure*/
