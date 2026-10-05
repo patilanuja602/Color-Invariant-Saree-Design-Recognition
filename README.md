@@ -1,63 +1,211 @@
-# Saree Design Recognition — colour-invariant design retrieval ("face recognition for textiles")
+# Color-Invariant Saree Design Recognition
 
-## 1–3. Overview, problem, objective
-Identify a saree by the **design on its surface**, independent of colour palette. Same design + different colour ⇒ match; different design + same colour ⇒ no match.
-Core ML task = **design retrieval** (embedding + gallery search) and **pair verification**. *Saree type* is a user-facing readout of the retrieved reference designs' metadata — **not** a classifier.
+### Design retrieval for sarees, independent of colour
 
-## 4–5. Architecture & model (audited from the training notebook / checkpoint)
+**Live Demo:** `COMING SOON`
+
+**GitHub:** [patilanuja602](https://github.com/patilanuja602)
+**LinkedIn:** [Anuja Patil](https://www.linkedin.com/in/anuja-patil-7649a124)
+
+---
+
+## Project Overview
+
+This project identifies a saree based on its **surface design or pattern**, independent of its colour.
+
+The key challenge is that the **same design can appear in different colours**, while different designs can have similar colours.
+
+For example:
+
+```text
+Same design + different colour  →  Match
+Different design + same colour  →  Do not match
 ```
-image → EXIF/RGB → 256² bicubic → 224² bilinear → ImageNet norm → DINOv2-S/14 → [CLS ‖ mean patch] (768)
-      → LayerNorm → Dropout → Linear(768,1024) → GELU → Linear(1024,256) → L2-norm → 256-d embedding
-embedding ─┬─ cosine vs cached gallery → design-level aggregation → category evidence → saree type / "unknown"
-           └─ cosine vs second image  → SAME / DIFFERENT (validation-derived threshold 0.7034)
+
+Because of this, the problem is treated as **design retrieval and verification**, rather than simple saree classification.
+
+The saree type shown to the user is obtained from the metadata of the retrieved reference designs.
+
+---
+
+## How It Works
+
+```text
+Saree Image
+     ↓
+Image Preprocessing
+     ↓
+DINOv2 Feature Extraction
+     ↓
+256-D Design Embedding
+     ↓
+Cosine Similarity Search
+     ↓
+Design-Level Matching
+     ↓
+Saree Type / Unknown
 ```
-23.1 M params (8.15 M tuned in final stage), 12.25 GFLOPs/img, 256-d embedding (numbers from `evaluation/results.json`).
 
-## 6–7. Training & colour invariance (from notebook)
-Frozen warm-up (8 ep) then last 4 DINOv2 blocks (LR 1e-5) + head (3e-4), AdamW wd 0.05, warm-up + schedule, early stopping on val mAP. Two-view **supervised contrastive** loss (T=0.1), 8 designs × 4 images per batch. GPU colour augmentation (hue, channel permutation, saturation, gamma, grayscale) so colour cannot be a shortcut; batches include **same-colour / different-design hard negatives** with a pHash/similarity **false-negative guard**; de-duplicated Kaggle images serve as extra negatives. Ablations stored: B1 frozen RGB, B4 frozen gray, B2 fine-tuned+colour-aug, B3 final.
+The model converts each saree image into a **256-dimensional embedding**.
 
-## 8–10. Retrieval, verification, saree type
-* **Retrieval**: cosine on L2-normalised vectors (= dot product). Images are collapsed to **designs** (`max` over a design's colourways by default; `topn_mean` configurable) so one design is never listed several times.
-* **Verification**: cosine ≥ τ, τ = 0.7034 = max-F1 on **validation** pairs (never tuned on test).
-* **Saree type**: `score(c) = Σ_{top-5 designs in c} max(0, sim − τ)`. Similarity-weighted, each design counted once, only designs above τ count. If the best design < τ → *"No sufficiently similar known design found."* If the runner-up ≥ 75 % of the winner → shown as *Alternative*. Scores are retrieval evidence, **not probabilities**. Motif names are never shown (none exist in metadata).
-* **Extensibility**: add labelled images of new types (Kanjeevaram, Paithani…) to the gallery and re-run `build_gallery.py` — no retraining.
+Images with similar surface designs should produce similar embeddings. The query embedding is compared with embeddings stored in the reference gallery to retrieve the closest designs.
 
-## 11–12. Evaluation & results
-Full tables are in the app (Evaluation page) and `evaluation/results_{val,test}.csv`. Final model **B3_final**, design-disjoint split, DeepLure test = 8 queries / 28 gallery images / 23 designs; val = 20 / 31 / 19.
+Multiple images belonging to the same design are aggregated so that the same design is not repeatedly displayed as separate matches.
 
-| split | R@1 | R@5 | R@10 | mAP | MRR | ver. ROC-AUC | PR-AUC | EER | F1 | precision | recall |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| val | 0.90 | 1.00 | 1.00 | 0.917 | 0.95 | 0.937 | 0.447 | 0.108 | 0.643 | 0.47 | 1.00 |
-| test | 0.50 | 1.00 | 1.00 | 0.764 | 0.75 | 0.924 | 0.375 | 0.171 | 0.370 | 0.23 | 1.00 |
+---
 
-**Honest reading**: R@5/R@10 are saturated because galleries are tiny; test R@1 rests on 8 queries (bootstrap CI in CSV is very wide); at τ=0.703 recall is 1.0 but precision is low (many false positives, esp. same-colour negatives) and the frozen DINOv2 baselines scored higher test R@1 (0.75). We do **not** swap models after seeing test. Saree-type accuracy is **not in the bundle** → `scripts/evaluate.py` computes it (output `evaluation/category_eval.json`).
+## Model
 
-## 13–15. Data, limitations, pretrained resources
-* **DeepLure corpus** (proprietary, not redistributed): no reliable design ids → **auto-proposed pseudo-labels** (`label_source=auto_proposed`), 5 images excluded as blank, some low-texture. **No saree-type metadata.**
-* **Kaggle Indian Saree Patterns**: category labels only (Banarasi 132 / Pichwai 94 / Bandhani 92 / Ikat 92 in `splits.csv`); heavy augmentation duplicates → de-duplicated by pHash, each kept image gets a unique pseudo `design_id` (`kaggle_N`) — **category ≠ design id**.
-* Therefore the saree-type gallery is the Kaggle gallery; DeepLure images can be added by you privately (type will show *Unknown / unavailable*).
-* Pretrained: `facebook/dinov2-small` (Meta). External data: Kaggle dataset (disclosed).
+The system uses **DINOv2-S/14** as the visual feature extractor with a trainable projection head.
 
-## 16–19. Run it
-```bash
-pip install -r requirements.txt
-# 1. slim checkpoint (removes DeepLure gallery embeddings/filenames baked into the training .pt)
-python scripts/export_slim.py /path/saree_design_embedder.pt weights/saree_embedder_slim.pt
-# 2. public gallery from the Kaggle download (unzipped anywhere) using the documented split
-python scripts/build_gallery.py --splits-csv evaluation/splits.csv --kaggle-dir /path/to/kaggle --splits train,val
-python scripts/evaluate.py --kaggle-dir /path/to/kaggle        # saree-type accuracy on Kaggle test split
-streamlit run app/streamlit_app.py
-pytest -q
+### Training
+
+* PyTorch
+* Supervised Contrastive Learning
+* Two-view training
+* Colour augmentation using hue changes, channel permutation, saturation, gamma and grayscale
+* Same-colour / different-design hard negatives
+* pHash-based false-negative protection
+* Frozen warm-up followed by fine-tuning of the last DINOv2 blocks
+* AdamW optimizer
+
+### Final Model
+
+* Embedding size: **256**
+* Parameters: **23.1M**
+* Parameters tuned in final stage: **8.15M**
+* Approximate computation: **12.25 GFLOPs/image**
+
+---
+
+## Results
+
+The final model was evaluated using design-disjoint validation and test splits.
+
+| Split      |  R@1 |  R@5 | R@10 |   mAP | ROC-AUC |   EER |
+| ---------- | ---: | ---: | ---: | ----: | ------: | ----: |
+| Validation | 0.90 | 1.00 | 1.00 | 0.917 |   0.937 | 0.108 |
+| Test       | 0.50 | 1.00 | 1.00 | 0.764 |   0.924 | 0.171 |
+
+The test set contains only **8 queries**, so R@1 has high uncertainty. The complete evaluation results and additional metrics are available in the project files.
+
+The verification threshold of **0.7034** was selected using the validation set and was not tuned on the test set.
+
+---
+
+## Training Code
+
+The complete model training and evaluation code is available in the Google Colab notebook:
+
+**[Open Training Notebook](saree_design_retrieval_colab.ipynb)**
+
+The notebook contains:
+
+* Dataset preparation
+* Image preprocessing
+* Model architecture
+* Colour augmentation
+* Contrastive training
+* Validation
+* Retrieval evaluation
+* Verification evaluation
+* Result generation
+
+---
+
+## Dataset Audit
+
+Before training, the available datasets were inspected for duplicates, label quality, image quality, colour bias and possible data leakage.
+
+The complete audit is available here:
+
+**[View Dataset Audit Report](Dataset%20Audit%20Report.pdf)**
+
+The project uses:
+
+* **DeepLure Saree Corpus**
+* **Indian Saree Patterns dataset from Kaggle**
+
+The DeepLure corpus is proprietary and is **not redistributed in this repository**.
+
+The Kaggle dataset provides saree category information. Category labels are kept separate from design identity because the core task is design retrieval.
+
+---
+
+## Live Application
+
+The deployed application will allow a user to:
+
+1. Upload a saree image
+2. Generate its design embedding
+3. Search the reference gallery
+4. View the closest design matches
+5. See the associated saree type
+6. Verify whether two images represent the same design
+
+### Live Demo
+
+**[Open the Live Application](YOUR_DEPLOYED_APP_LINK)**
+
+*The deployment link will be added once the application is live.*
+
+---
+
+## Repository Structure
+
+```text
+Color-Invariant-Saree-Design-Recognition/
+│
+├── saree_design_retrieval_colab.ipynb
+├── Dataset Audit Report.pdf
+├── Patil_Anuja.pdf
+├── README.md
+│
+└── deployment/
+    └── ...
 ```
-Private gallery: `python scripts/build_gallery.py --metadata my.csv --images-root /private/imgs --out gallery_private` then `SAREE_GALLERY=gallery_private streamlit run …`. CSV columns: `image_path` (+ optional `design_id, colorway_id, category`).
 
-## Deployment (Streamlit Community Cloud)
-Slim weights ≈ 90 MB: keep out of git (`.gitignore`); upload as a **GitHub Release asset** and set secret `SAREE_WEIGHTS_URL = "<direct asset URL>"` (the app downloads once, cached). Commit `gallery/` (Kaggle images + `metadata.csv` + `embeddings.npy`) only after confirming the dataset licence allows redistribution; otherwise host the gallery the same way. CPU-only torch is used; expect ~1 GB RAM. Main file: `app/streamlit_app.py`.
+The deployment files and supporting inference code will be added as the application is finalized.
 
-## 20. Structure
-`app/` UI · `src/` engine (UI-independent) · `scripts/` build/evaluate/export · `tests/` · `evaluation/` shipped results · `figures/` · `notebooks/training.ipynb` · `gallery/` · `docs/`.
+---
 
-## 21–23. Reproducibility, limitations, future
-Seed 42, config in `evaluation/results.json`. Limitations: pseudo-labels, tiny splits, low verification precision, Kaggle categories are image-level not design-level, no motif names. Future: other garments = new gallery + (optionally) re-fine-tune with garment-specific design ids; manual verified design CSV (`use_verified_csv`) is the highest-value upgrade.
+## Limitations
 
-> Not executed here: this build environment had no PyTorch/network, so the app, tests and model loading are **written but unrun**. Run `pytest -q` first; see docs/SUBMISSION.md.
+The current system has some limitations:
+
+* The available DeepLure data does not contain reliable design IDs
+* Some design groups use automatically proposed labels
+* The evaluation dataset is relatively small
+* Verification precision is lower than recall at the selected threshold
+* Saree categories depend on the metadata available in the reference gallery
+* Motif names are not available in the current metadata
+
+A manually verified design-level metadata file would be an important improvement.
+
+---
+
+## Future Improvements
+
+* Larger verified design gallery
+* More real same-design / different-colour pairs
+* Improved hard-negative mining
+* Larger evaluation sets
+* Additional saree types such as Kanjeevaram and Paithani
+* Extension to other garment categories
+
+New designs can be added to the gallery without retraining the complete model.
+
+---
+
+## About Me
+
+### Anuja Patil
+
+Computer Science Engineering | AI / Machine Learning
+
+I work on practical AI and computer vision systems, with experience in machine learning, computer vision, model development and deployment.
+
+**GitHub:** [patilanuja602](https://github.com/patilanuja602)
+**LinkedIn:** [anuja-patil-7649a124](https://www.linkedin.com/in/anuja-patil-7649a124)
+**Resume:** [View Resume](Patil_Anuja.pdf)
+
