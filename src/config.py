@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WEIGHTS = Path(os.getenv("SAREE_WEIGHTS", ROOT / "weights" / "saree_embedder_slim.pt"))
-WEIGHTS_URL = os.getenv("SAREE_WEIGHTS_URL", "")          # direct link (GitHub Release / HF Hub) used if file is missing
+WEIGHTS_URL = os.getenv("SAREE_WEIGHTS_URL", "https://github.com/patilanuja602/Color-Invariant-Saree-Design-Recognition/releases/download/v1.0.0/saree_embedder_slim.pt")          # direct link (GitHub Release / HF Hub) used if file is missing
 GALLERY_DIR = Path(os.getenv("SAREE_GALLERY", ROOT / "gallery"))
 EVAL_DIR = ROOT / "evaluation"
 FIG_DIR = ROOT / "figures"

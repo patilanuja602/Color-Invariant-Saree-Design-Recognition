@@ -6,9 +6,7 @@ venv/
 *.zip
 .ipynb_checkpoints/
 # proprietary / large / derived-from-private-data
-weights/*.pt
-saree_design_embedder.pt
+
+
 data/
 deeplure*/
-gallery/images/*
-!gallery/images/.gitkeep
